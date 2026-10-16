@@ -22,7 +22,9 @@ async function runtime(t, { failMcp = false, missingTunnel = false, missingKey =
   await chmod(directory, 0o777);
   const bin = join(directory, "bin");
   await mkdir(bin);
+  await chmod(bin, 0o755);
   await mkdir(join(directory, "dist"));
+  await chmod(join(directory, "dist"), 0o755);
   if (process.getuid() === 0) {
     execFileSync(process.execPath, ["-e", "require('node:fs').writeFileSync(process.argv[1], 'fixture-owner-token', {mode:0o600})", join(directory, "owner-credential")], { uid: 1000, gid: 1000 });
   } else {
@@ -80,6 +82,7 @@ if (name === "mcp") {
   t.after(async () => {
     if (child.exitCode === null && child.signalCode === null) child.kill("SIGTERM");
     await exited;
+    if (output.trim()) t.diagnostic(output.trim());
     await rm(directory, { recursive: true });
   });
   return { child, exited, directory, output: () => output };

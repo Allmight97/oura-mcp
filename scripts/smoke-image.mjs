@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import { request as httpRequest } from "node:http";
 import { setTimeout as delay } from "node:timers/promises";
 
 const image = process.argv[2];
@@ -28,17 +29,29 @@ try {
     await delay(100);
   }
   assert.ok(ready, "Image listener must start");
+  function request(path, headers, body) {
+    return new Promise((resolve, reject) => {
+      const req = httpRequest(`${url}${path}`, { method: "POST", headers }, response => {
+        let text = "";
+        response.setEncoding("utf8");
+        response.on("data", chunk => { text += chunk; });
+        response.on("end", () => resolve(new Response(text, { status: response.statusCode })));
+      });
+      req.on("error", reject);
+      req.end(body);
+    });
+  }
   async function call(host, credential, method, params = {}) {
     const headers = { Host: host, "Content-Type": "application/json", Accept: "application/json, text/event-stream" };
     if (credential) headers.Authorization = `Bearer ${credential}`;
-    const response = await fetch(`${url}/mcp`, { method: "POST", headers, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }) });
+    const response = await request("/mcp", headers, JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }));
     let body = await response.text();
     if (body.startsWith("event:")) body = body.split("\n").find(line => line.startsWith("data: ")).slice(6);
     return { status: response.status, body: JSON.parse(body) };
   }
   assert.equal((await call("public.example", undefined, "tools/list")).status, 401);
   assert.equal((await call("public.example", "wrong", "tools/list")).status, 401);
-  const rejectedHost = await fetch(`${url}/mcp`, { method: "POST", headers: { Host: "untrusted.example" }, body: "{}" });
+  const rejectedHost = await request("/mcp", { Host: "untrusted.example" }, "{}");
   assert.equal(rejectedHost.status, 403);
   const listed = await call("public.example", token, "tools/list");
   assert.equal(listed.status, 200);
