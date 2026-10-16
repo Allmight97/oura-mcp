@@ -1,0 +1,12 @@
+services:
+  oura-mcp:
+    user: "0:0"
+    command: [node, dist/run.js]
+    cap_add: [SETUID, SETGID, KILL]
+    tmpfs:
+      - /home/tunnel:uid=10001,gid=10001,mode=0700
+    environment:
+      CONTROL_PLANE_API_KEY: ${CONTROL_PLANE_API_KEY:?Set CONTROL_PLANE_API_KEY}
+      OPENAI_TUNNEL_ID: ${OPENAI_TUNNEL_ID:?Set OPENAI_TUNNEL_ID}
+    healthcheck:
+      test: [CMD, node, -e, "Promise.all(['http://127.0.0.1:8787/healthz', 'http://127.0.0.1:8080/readyz'].map(url => fetch(url, {signal: AbortSignal.timeout(1500)}))).then(rs => {if (rs.some(r => !r.ok)) process.exit(1)}).catch(() => process.exit(1))"]

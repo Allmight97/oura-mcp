@@ -1,0 +1,7 @@
+interface:
+  display_name: "Oura"
+  short_description: "Query live Oura data, read-only"
+  default_prompt: "Use $oura to fetch my recent Oura data."
+
+policy:
+  allow_implicit_invocation: false

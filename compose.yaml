@@ -1,0 +1,30 @@
+services:
+  oura-mcp:
+    image: ghcr.io/allmight97/oura-mcp:latest
+    platform: linux/amd64
+    init: true
+    restart: unless-stopped
+    stop_grace_period: 45s
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs: [/tmp]
+    environment:
+      OURA_CLIENT_ID: ${OURA_CLIENT_ID:?Set OURA_CLIENT_ID}
+      OURA_CLIENT_SECRET: ${OURA_CLIENT_SECRET:?Set OURA_CLIENT_SECRET}
+      OURA_REDIRECT_URI: ${OURA_REDIRECT_URI:?Set OURA_REDIRECT_URI}
+      SETUP_KEY: ${SETUP_KEY:?Set SETUP_KEY}
+      MCP_PUBLIC_HOSTNAME: ${MCP_PUBLIC_HOSTNAME:?Set MCP_PUBLIC_HOSTNAME}
+      MCP_ACCESS_TOKEN: ${MCP_ACCESS_TOKEN:?Set MCP_ACCESS_TOKEN}
+    ports:
+      - "127.0.0.1:8787:8787"
+    volumes:
+      - oura-credential:/data
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:8787/healthz', {signal: AbortSignal.timeout(1500)}).then(r => {if (!r.ok) process.exit(1)}).catch(() => process.exit(1))"]
+      interval: 5s
+      timeout: 4s
+      retries: 3
+      start_period: 30s
+volumes:
+  oura-credential:

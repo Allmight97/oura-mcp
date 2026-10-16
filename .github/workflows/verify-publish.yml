@@ -1,0 +1,86 @@
+name: Verify and publish baseline
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - run: npm test
+      - run: npm audit --omit=dev
+      - run: python3 scripts/check-packaging.py
+      - name: Validate portable plugin schema
+        run: |
+          python3 -m pip install check-jsonschema==0.37.4
+          check-jsonschema --schemafile https://agent-plugins.org/schemas/1.0.0/plugin.schema.json plugins/oura/plugin.json
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f
+      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8
+        with:
+          context: .
+          load: true
+          platforms: linux/amd64
+          tags: oura-mcp:test
+          provenance: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - run: node scripts/smoke-image.mjs oura-mcp:test
+      - name: Verify tunnel isolation and lifecycle under the image runtime
+        run: >-
+          docker run --rm --user 0:0 --init --read-only --tmpfs /tmp
+          --cap-drop=ALL --cap-add=SETUID --cap-add=SETGID --cap-add=KILL
+          --security-opt=no-new-privileges:true
+          -v "$PWD:/test:ro" -w /test oura-mcp:test
+          node --test auth.test.mjs runtime.test.mjs
+
+  publish:
+    needs: verify
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8
+        id: image
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ghcr.io/allmight97/oura-mcp:latest
+            ghcr.io/allmight97/oura-mcp:sha-${{ github.sha }}
+          provenance: mode=max
+          sbom: true
+          cache-from: type=gha
+      - uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a
+        with:
+          subject-name: ghcr.io/allmight97/oura-mcp
+          subject-digest: ${{ steps.image.outputs.digest }}
+          push-to-registry: true

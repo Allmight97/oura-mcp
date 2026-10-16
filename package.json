@@ -1,0 +1,20 @@
+{
+  "name": "oura-mcp",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "tsc --noEmit",
+    "build": "tsc --noEmit false --outDir dist",
+    "start": "node dist/run.js",
+    "test": "npm run build && node --test *.test.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/node": "2.0.0",
+    "@modelcontextprotocol/server": "2.0.0",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "24.3.0",
+    "typescript": "6.0.3"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "name": "oura",
+  "owner": {
+    "name": "Allmight97"
+  },
+  "metadata": {
+    "description": "Oura MCP companion skill"
+  },
+  "plugins": [
+    {
+      "name": "oura",
+      "source": "plugins/oura",
+      "description": "Companion skill for querying your own self-hosted Oura MCP. Configure the MCP connection separately."
+    }
+  ]
+}

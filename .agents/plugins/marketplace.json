@@ -1,0 +1,17 @@
+{
+  "name": "oura",
+  "plugins": [
+    {
+      "name": "oura",
+      "source": {
+        "source": "local",
+        "path": "./plugins/oura"
+      },
+      "category": "Productivity",
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      }
+    }
+  ]
+}

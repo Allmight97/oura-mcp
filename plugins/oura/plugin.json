@@ -1,0 +1,17 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "oura",
+  "version": "1.1.1",
+  "description": "Companion skill for querying your own self-hosted Oura MCP. Configure the MCP connection separately.",
+  "author": {
+    "name": "Allmight97"
+  },
+  "homepage": "https://github.com/Allmight97/oura-mcp",
+  "repository": "https://github.com/Allmight97/oura-mcp",
+  "license": "MIT",
+  "keywords": [
+    "oura",
+    "mcp",
+    "self-hosted"
+  ]
+}
