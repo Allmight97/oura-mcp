@@ -57,8 +57,10 @@ it does not configure your DNS, router, certificate, or firewall.
    These are configuration values for your installation; never commit them.
 
 4. Configure HTTPS forwarding for `/mcp` and `/oauth/oura/callback` to
-   `http://127.0.0.1:8787`, preserving the public `Host`. Keep the admin setup
-   endpoint local. **Never rewrite public requests to `Host: oura-mcp`**: that
+   `http://127.0.0.1:8787`, preserving the public `Host`. The proxy must accept
+   only your configured public hostname and reject every other `Host`, including
+   `oura-mcp`, before forwarding. Keep the admin setup endpoint local.
+   **Never rewrite public requests to `Host: oura-mcp`**: that
    name is trusted for the private tunnel. Do not forward a NAS administration
    interface as part of exposing this MCP.
 
