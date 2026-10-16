@@ -68,7 +68,9 @@ Recommended first product path: user-controlled hosting and a single owner.
 3. Redeem the claim in the browser and register an owner passkey. Bind login to
    the configured HTTPS origin. Disable public signup and consume the claim
    atomically. Keep recovery under host-owner control, with no public reset path.
-4. Register an Oura developer application and enter its credentials through the
+4. Register an Oura developer application at
+   **[developer.ouraring.com](https://developer.ouraring.com/)** and enter its
+   credentials through the
    owner's authenticated setup screen. Supply the exact callback URL shown by
    the installation. Never place a shared project's client secret in the image.
 5. Choose Oura categories, sign in at Oura, and consent. The server uses state
@@ -155,8 +157,8 @@ keeping the container in their hosting account. Choose a provider only after
 testing persistent storage, HTTPS, idle behavior, IPv4 reachability, backup,
   region and cost. No provider-specific template is selected by this design.
 
-Oura documents a default ten-user quota per developer application and review for
-wider use. That quota does not impose multi-owner containers. Self-hosted owners
+Oura's [v2 reference](https://cloud.ouraring.com/v2/docs) documents a default
+ten-user quota per developer application and review for wider use. That quota does not impose multi-owner containers. Self-hosted owners
 using their own developer applications and a project-operated shared application
 are different distribution models. Do not present the quota as approval of a
 particular public product or of distributing its client secret.
@@ -274,7 +276,9 @@ library certification do not establish end-to-end correctness.
 ## Primary sources
 
 - [Oura OAuth and PKCE](https://cloud.ouraring.com/docs/authentication)
-- [Oura developer application quota and review](https://cloud.ouraring.com/docs/)
+- [Developer portal: developer.ouraring.com](https://developer.ouraring.com/)
+- [Oura API v2, developer application quota and review](https://cloud.ouraring.com/v2/docs)
+- [API v2 and current portal verification](oura-api-v2.md)
 - [MCP authorization, 2026-07-28](https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization)
 - [OpenAI MCP authentication](https://developers.openai.com/plugins/build/auth)
 - [Claude connector authentication](https://claude.com/docs/connectors/building/authentication)

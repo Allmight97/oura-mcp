@@ -48,7 +48,10 @@ it does not configure your DNS, router, certificate, or firewall.
    On a NAS, also remove inherited share ACLs that let other service accounts
    read or replace this directory. A mode of 0600 alone may not override them.
 
-2. Register your own application in the [Oura developer portal](https://developer.ouraring.com/).
+2. Register your own application at **[developer.ouraring.com](https://developer.ouraring.com/)**,
+   Oura's current developer portal. See [API v2 and portal details](docs/oura-api-v2.md)
+   for the official references and the distinction between app credentials and
+   user authorization.
    Register `https://YOUR-HOST/oauth/oura/callback` as its redirect URI. Enter its
    client ID and secret in `.env`, with that exact URI and your public hostname.
    Each person authorizes an individual grant; an application user quota is

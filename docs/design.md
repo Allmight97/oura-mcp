@@ -62,7 +62,8 @@ future hosted service would introduce a separate custody and tenant decision.
 ## Primary references
 
 - [Oura authorization](https://cloud.ouraring.com/docs/authentication)
-- [Oura developer portal](https://developer.ouraring.com/)
+- [Oura developer portal: developer.ouraring.com](https://developer.ouraring.com/)
+- [API v2 and current portal verification](oura-api-v2.md)
 - [MCP authorization](https://modelcontextprotocol.io/specification/latest/basic/authorization)
 - [MCP security practices](https://modelcontextprotocol.io/specification/latest/basic/security_best_practices)
 - [OpenAI packaging](https://developers.openai.com/plugins/build/plugins)
