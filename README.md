@@ -7,6 +7,8 @@ records, configured personal endpoint, or hosted service.
 This is the published working baseline. Universal cloud onboarding is the next
 deliverable: installing a companion plugin does not start a container or connect
 an MCP server. See [design and support boundaries](docs/design.md).
+The [universal onboarding proposal](docs/universal-onboarding.md) describes the
+planned OAuth connection flow and the real-client proof required before shipping.
 
 ## What works
 

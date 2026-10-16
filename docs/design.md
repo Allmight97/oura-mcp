@@ -2,6 +2,8 @@
 
 The first public deliverable is a working single-owner server image and companion
 package. Uniform ChatGPT, Claude.ai and Grok Bot cloud onboarding is deferred.
+The [onboarding proposal](universal-onboarding.md) develops that next deliverable;
+its owner login and MCP OAuth flow are not implemented in the baseline.
 The source and image contain no installation credentials, personal endpoints or
 health responses. A clean installation must supply its own hosting and consent.
 
