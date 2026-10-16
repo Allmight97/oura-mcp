@@ -1,9 +1,16 @@
-# Universal onboarding proposal
+# Universal onboarding design
 
-Status: design proposal, checked against primary documentation on 2026-10-15.
+Status: agreed target architecture, reviewed with Claude Opus 5.5 High and checked
+against primary documentation on 2026-10-15. Implementation has not begun.
 The published baseline and live installations still use their existing auth.
-No OAuth server, passkey login, or universal client compatibility is implemented
-by this document. Personal Grok Bot interoperability remains unproven.
+Library selection and real-client compatibility depend on the evidence gates
+below. Personal Grok Bot interoperability remains unproven.
+
+The settled shape is one container per Oura owner, with a non-root application
+providing MCP tools, an embedded OAuth authorization server, owner passkey login,
+and setup/consent pages. The container retains the Oura grant and issues separate,
+revocable MCP grants to agent clients. User-controlled hosting supplies public
+HTTPS. A project-operated hosting service is outside this milestone.
 
 ## Intended outcome
 
@@ -146,7 +153,7 @@ after the protocol and persistence tests below, not from feature names alone.
 A cloud deployment template can remove router administration for users while
 keeping the container in their hosting account. Choose a provider only after
 testing persistent storage, HTTPS, idle behavior, IPv4 reachability, backup,
-region and cost. No provider-specific template is selected by this proposal.
+  region and cost. No provider-specific template is selected by this design.
 
 Oura documents a default ten-user quota per developer application and review for
 wider use. That quota does not impose multi-owner containers. Self-hosted owners
@@ -258,7 +265,7 @@ single public listing pointing at the maintainer's endpoint cannot serve them.
 7. **Fresh installation and cutover:** prove setup on a clean host and document
    provider availability/plan limits. Only then prepare an upgrade of an existing
    deployment, retaining its live grant and verifying each existing agent before
-   retiring the old route. No live NAS or router change is part of this proposal.
+   retiring the old route. No live NAS or router change is part of this design work.
 
 Independent evidence is the raw protocol, negative tests, upstream response
 comparison, persistent revocation and real-client results. Model agreement and
