@@ -44,6 +44,10 @@ const config = {
   port: Number(process.env.PORT ?? "8787")
 };
 
+// Below common MCP client tool-call limits. Token exchange has no deadline:
+// aborting it after Oura rotated the refresh token would lose the grant.
+const OURA_QUERY_DEADLINE_MS = 30_000;
+
 process.umask(0o077);
 
 class OuraCredential {
@@ -186,7 +190,10 @@ class OuraCredential {
     }
     if (input.cursor) url.searchParams.set("next_token", input.cursor);
     if (input.latest) url.searchParams.set("latest", "true");
-    return fetch(url, { headers: { authorization: `Bearer ${accessToken}` } });
+    return fetch(url, {
+      headers: { authorization: `Bearer ${accessToken}` },
+      signal: AbortSignal.timeout(OURA_QUERY_DEADLINE_MS)
+    });
   }
 
   private async read(): Promise<StoredCredential> {

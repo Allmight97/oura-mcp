@@ -11,6 +11,7 @@
 - `granted_scopes` comes only from Oura's token response, and is `null` when Oura omits it.
   The deprecated callback `scope` parameter is ignored; a refresh already discarded it.
 - Credential writes are fsynced before and after the rename, so a power cut cannot leave an empty grant file.
+- An Oura collection request that stalls fails after 30 seconds instead of holding the query and shutdown.
 - Overlapping main-branch workflow runs cancel the older run, so it cannot republish `latest`.
 
 ## Baseline

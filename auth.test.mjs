@@ -25,7 +25,12 @@ async function startServer(t, settings) {
   let output = "";
   child.stdout.on("data", b => { output += b; });
   child.stderr.on("data", b => { output += b; });
-  t.after(async () => { if (child.exitCode === null) child.kill(); await closed; await rm(directory, {recursive:true}); });
+  t.after(async () => {
+    if (child.exitCode === null) child.kill();
+    await Promise.race([closed, delay(5000).then(() => child.kill("SIGKILL"))]);
+    await closed;
+    await rm(directory, {recursive:true});
+  });
   await Promise.race([once(child.stdout, "data"), closed.then(() => { throw new Error(output); })]);
   async function request(host, token, origin, message = {jsonrpc:"2.0",id:1,method:"tools/list",params:{}}) {
     const headers = { Host: host, "Content-Type": "application/json", Accept: "application/json, text/event-stream" };
@@ -60,18 +65,19 @@ function parse(body) {
   return JSON.parse(body.startsWith("event:") ? body.split("\n").find(line => line.startsWith("data: ")).slice(6) : body);
 }
 
-// Replaces fetch in the server process; `handler` is the source of an async function from a recorded call to a Response.
-async function stubOura(directory, handler) {
+// Replaces fetch in the server process; `handler` is the source of an async function from a recorded call and the fetch init to a Response.
+async function stubOura(directory, handler, { shortDeadlines = false } = {}) {
   const log = join(directory, "upstream-calls.jsonl");
   const preload = join(directory, "upstream.mjs");
   await writeFile(preload, `
 import { appendFile, writeFile } from "node:fs/promises";
 import { setTimeout as delay } from "node:timers/promises";
 const handle = ${handler};
+${shortDeadlines ? "const timeout = AbortSignal.timeout.bind(AbortSignal); AbortSignal.timeout = () => timeout(100);" : ""}
 globalThis.fetch = async (url, init = {}) => {
   const call = { url: String(url), authorization: init.headers?.authorization ?? null, form: init.body ? Object.fromEntries(new URLSearchParams(String(init.body))) : null };
   await appendFile(${JSON.stringify(log)}, JSON.stringify(call) + "\\n");
-  return handle(call);
+  return handle(call, init);
 };
 `);
   return {
@@ -157,6 +163,18 @@ test("a query maps bounds and cursor, retries once after 401 with a refreshed to
     assert.equal((await server.callTool("oura_query", args)).isError, true, JSON.stringify(args));
   }
   assert.equal((await upstream.calls()).length, before, "invalid bounds must not reach Oura");
+});
+
+test("a stalled Oura collection request fails at its deadline", { timeout: 10000 }, async t => {
+  const directory = await mkdtemp(join(tmpdir(), "oura-stall-"));
+  t.after(() => rm(directory, { recursive: true }));
+  const credentialFile = join(directory, "credential.json");
+  await writeFile(credentialFile, JSON.stringify({ token: { access_token: "valid-access", refresh_token: "valid-refresh", expires_at: 4102444800 } }));
+  const upstream = await stubOura(directory, `(call, init) => new Promise((_, reject) => init.signal?.addEventListener("abort", () => reject(init.signal.reason)))`, { shortDeadlines: true });
+  const server = await startServer(t, { OURA_CREDENTIAL_FILE: credentialFile, NODE_OPTIONS: upstream.NODE_OPTIONS });
+  const result = await server.callTool("oura_query", { collection: "daily_sleep", start: "2026-10-14", end: "2026-10-15" });
+  assert.equal(result.isError, true);
+  assert.match(result.content[0].text, /timeout/i);
 });
 
 test("a forged callback leaves the owner's pending authorization usable", async t => {
