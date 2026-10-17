@@ -12,6 +12,7 @@
   The deprecated callback `scope` parameter is ignored; a refresh already discarded it.
 - Credential writes are fsynced before and after the rename, so a power cut cannot leave an empty grant file.
 - An Oura collection request that stalls fails after 30 seconds instead of holding the query and shutdown.
+- `npm start` runs the baseline server; tunnel mode stays on its Compose command.
 - Overlapping main-branch workflow runs cancel the older run, so it cannot republish `latest`.
 
 ## Baseline
