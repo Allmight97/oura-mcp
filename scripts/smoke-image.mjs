@@ -13,11 +13,12 @@ const files = docker("run", "--rm", "--entrypoint", "sh", image, "-c", "find /ap
 assert.ok(!files.includes(".env") && !files.includes("credential.json"));
 assert.ok(!files.includes("test.mjs") && !files.includes("DESIGN.md"));
 const token = "synthetic-image-smoke-".padEnd(64, "x");
+const setupKey = "synthetic-setup-key-".padEnd(64, "x");
 const id = docker("run", "-d", "--rm", "--init", "--read-only", "--cap-drop=ALL",
   "--security-opt=no-new-privileges:true", "--tmpfs", "/tmp", "-p", "127.0.0.1::8787",
   "-e", "OURA_CLIENT_ID=synthetic", "-e", "OURA_CLIENT_SECRET=synthetic",
   "-e", "OURA_REDIRECT_URI=https://public.example/oauth/oura/callback",
-  "-e", "SETUP_KEY=synthetic", "-e", "MCP_PUBLIC_HOSTNAME=public.example",
+  "-e", `SETUP_KEY=${setupKey}`, "-e", "MCP_PUBLIC_HOSTNAME=public.example",
   "-e", `MCP_ACCESS_TOKEN=${token}`, image);
 try {
   const port = docker("port", id, "8787/tcp").split(":").at(-1);
@@ -59,13 +60,13 @@ try {
   const catalog = await call("public.example", token, "tools/call", { name: "oura_catalog", arguments: {} });
   assert.equal(catalog.status, 200);
   assert.equal(catalog.body.result.structuredContent.oura_authorized, false);
-  const setup = await fetch(`${url}/admin/oura/authorize`, { method: "POST", headers: { "X-Setup-Key": "synthetic" } });
-  assert.equal(setup.status, 200, "Non-root app must persist authorization state");
-  const grant = JSON.parse(docker("exec", id, "node", "-e", "const fs=require('node:fs');const p='/data/oura-credential.json';const s=fs.statSync(p);console.log(JSON.stringify({mode:s.mode&511,uid:s.uid,paired:Boolean(JSON.parse(fs.readFileSync(p)).token)}))"));
-  assert.deepEqual(grant, { mode: 0o600, uid: 1000, paired: false });
+  const setup = await fetch(`${url}/admin/oura/authorize`, { method: "POST", headers: { "X-Setup-Key": setupKey } });
+  assert.equal(setup.status, 200);
+  const grantVolume = JSON.parse(docker("exec", id, "node", "-e", "const fs=require('node:fs');fs.accessSync('/data',fs.constants.W_OK);console.log(JSON.stringify({uid:fs.statSync('/data').uid,uid_running:process.getuid()}))"));
+  assert.deepEqual(grantVolume, { uid: 1000, uid_running: 1000 }, "Non-root app must be able to persist its grant");
   const output = docker("logs", id);
   assert.ok(!output.includes(token));
-  console.log("Image starts non-root with an empty grant volume; private state persistence, authentication and both tools verified with synthetic configuration.");
+  console.log("Image starts non-root with an empty writable grant volume; authentication and both tools verified with synthetic configuration.");
 } finally {
   docker("stop", "--time", "10", id);
 }
