@@ -59,15 +59,17 @@ it does not configure your DNS, router, certificate, or firewall.
 
 3. Generate two different secrets with `openssl rand -hex 32`: one for
    `SETUP_KEY` and one for `MCP_ACCESS_TOKEN`. Enter them privately in `.env`.
+   The server refuses either value when it is shorter than 32 characters.
    These are configuration values for your installation; never commit them.
 
 4. Configure HTTPS forwarding for `/mcp` and `/oauth/oura/callback` to
    `http://127.0.0.1:8787`, preserving the public `Host`. The proxy must accept
    only your configured public hostname and reject every other `Host`, including
    `oura-mcp`, before forwarding. Keep the admin setup endpoint local.
-   **Never rewrite public requests to `Host: oura-mcp`**: that
-   name is trusted for the private tunnel. Do not forward a NAS administration
-   interface as part of exposing this MCP.
+   **Never rewrite public requests to `Host: oura-mcp`**: in the optional
+   tunnel mode that name skips the bearer check. Without the tunnel, every host
+   needs the bearer. Do not forward a NAS administration interface as part of
+   exposing this MCP.
 
 5. Start the published image:
 
@@ -93,7 +95,8 @@ it does not configure your DNS, router, certificate, or firewall.
    JS
    ```
 
-   Open the returned link, confirm you are signed into the intended Oura account,
+   Open the returned link within 10 minutes, without restarting the container,
+   and confirm you are signed into the intended Oura account,
    and approve access. The current authorization flow requests all available
    application scopes; Oura controls which scopes you grant. Keep the link private.
 
@@ -123,7 +126,9 @@ This still uses one container. The launcher starts MCP before the tunnel, stops
 both if either fails, and drains MCP requests on shutdown. The tunnel runs as
 UID 10001 with only its OpenAI credential. MCP runs as UID 1000 in both modes.
 This optional mode uses a root launcher with the listed Compose capabilities.
-It trusts that launcher and the host administrator.
+It trusts that launcher and the host administrator. The tunnel reaches MCP as
+`Host: oura-mcp` without a bearer, so in this mode any process that can reach
+the published loopback port can do the same.
 
 Connect the tunnel in your own ChatGPT developer configuration. A private tunnel
 does not publish a universal directory plugin or automatically authorize other
