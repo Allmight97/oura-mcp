@@ -1,5 +1,5 @@
 import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { mkdir, open, readFile, rename } from "node:fs/promises";
 import { createServer as createHttpServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { dirname } from "node:path";
 import { createMcpHandler, McpServer } from "@modelcontextprotocol/server";
@@ -210,8 +210,20 @@ class OuraCredential {
   private async write(value: StoredCredential): Promise<void> {
     await mkdir(dirname(config.credentialFile), { recursive: true, mode: 0o700 });
     const temporary = `${config.credentialFile}.new`;
-    await writeFile(temporary, JSON.stringify(value), { mode: 0o600 });
+    const file = await open(temporary, "w", 0o600);
+    try {
+      await file.writeFile(JSON.stringify(value));
+      await file.sync();
+    } finally {
+      await file.close();
+    }
     await rename(temporary, config.credentialFile);
+    const directory = await open(dirname(config.credentialFile), "r");
+    try {
+      await directory.sync();
+    } finally {
+      await directory.close();
+    }
   }
 }
 
