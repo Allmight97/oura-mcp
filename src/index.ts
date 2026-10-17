@@ -56,7 +56,7 @@ class OuraCredential {
     return {
       ...catalogPayload(),
       oura_authorized: Boolean(stored.token),
-      granted_scopes: stored.token?.scope?.split(/\s+/).filter(Boolean) ?? []
+      granted_scopes: stored.token?.scope?.split(/\s+/).filter(Boolean) ?? null
     };
   }
 
@@ -74,7 +74,7 @@ class OuraCredential {
     return url.toString();
   }
 
-  async completeAuthorization(code: string, state: string, grantedScope?: string): Promise<boolean> {
+  async completeAuthorization(code: string, state: string): Promise<boolean> {
     const pending = this.pendingAuthorization;
     if (!pending || pending.state !== state || Date.now() - pending.issuedAt > 10 * 60 * 1000) return false;
     this.pendingAuthorization = undefined;
@@ -86,7 +86,6 @@ class OuraCredential {
       client_secret: config.clientSecret,
       redirect_uri: config.redirectUri
     });
-    if (grantedScope) token.scope = grantedScope;
     await this.update(() => ({ token }));
     return true;
   }
@@ -293,7 +292,7 @@ const server = createHttpServer(async (request, response) => {
         sendText(response, 400, "Oura authorization was not completed.");
         return;
       }
-      if (!(await credential.completeAuthorization(code, state, url.searchParams.get("scope") ?? undefined))) {
+      if (!(await credential.completeAuthorization(code, state))) {
         sendText(response, 400, "Oura authorization state is invalid or expired. Request a new link.");
         return;
       }

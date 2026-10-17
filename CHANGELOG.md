@@ -8,6 +8,8 @@
   Pending authorization lives in memory, so a restart needs a new link.
 - A token refresh that finishes after a new authorization keeps the new grant.
 - Query bounds reject impossible dates and incomplete timestamps before calling Oura.
+- `granted_scopes` comes only from Oura's token response, and is `null` when Oura omits it.
+  The deprecated callback `scope` parameter is ignored; a refresh already discarded it.
 - Overlapping main-branch workflow runs cancel the older run, so it cannot republish `latest`.
 
 ## Baseline

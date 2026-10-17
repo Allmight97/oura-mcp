@@ -10,8 +10,8 @@ The `oura` MCP server exposes two read-only tools over the owner's Oura
 account. It returns Oura's native JSON with provenance and never summarizes.
 
 - `oura_catalog`: every mapped collection with its query shape, whether Oura
-  is authorized, and the granted scopes. Call it first when unsure of a
-  collection name or its bounds.
+  is authorized, and the granted scopes (`null` when Oura does not report
+  them). Call it first when unsure of a collection name or its bounds.
 - `oura_query`: one collection at a time. Date-range collections take `start`
   and `end` as `YYYY-MM-DD`; datetime collections take RFC 3339 with a
   timezone, or `latest: true` instead of bounds. Pass `cursor` from

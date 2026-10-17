@@ -52,7 +52,7 @@ async function startServer(t, settings) {
     assert.equal(response.status, 200);
     return new URL((await response.json()).authorization_url).searchParams.get("state");
   }
-  const callback = (code, state) => fetch(`http://127.0.0.1:${port}/oauth/oura/callback?code=${code}&state=${state}`);
+  const callback = (code, state, extra = "") => fetch(`http://127.0.0.1:${port}/oauth/oura/callback?code=${code}&state=${state}${extra}`);
   return {request, callTool, authorizationState, callback, output: () => output, stop: () => child.kill("SIGTERM"), exited: closed};
 }
 
@@ -166,10 +166,12 @@ test("a forged callback leaves the owner's pending authorization usable", async 
   const server = await startServer(t, { OURA_CREDENTIAL_FILE: join(directory, "credential.json"), NODE_OPTIONS: upstream.NODE_OPTIONS });
   const state = await server.authorizationState();
   assert.equal((await server.callback("forged", "wrong-state")).status, 400);
-  assert.equal((await server.callback("owner-code", state)).status, 200);
+  assert.equal((await server.callback("owner-code", state, "&scope=daily%20personal")).status, 200);
   assert.equal((await server.callback("owner-code", state)).status, 400, "state is single-use");
   assert.equal((await upstream.calls()).filter(call => call.form?.code).map(call => call.form.code).join(), "owner-code");
-  assert.equal((await server.callTool("oura_catalog")).structuredContent.oura_authorized, true);
+  const catalog = (await server.callTool("oura_catalog")).structuredContent;
+  assert.equal(catalog.oura_authorized, true);
+  assert.equal(catalog.granted_scopes, null, "the deprecated callback scope is not evidence of a grant");
 });
 
 test("a refresh that finishes after a new authorization keeps the new grant", async t => {
