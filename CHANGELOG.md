@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- `scripts/onboard.sh` guides a new owner from an empty folder to an approved Oura connection, with hidden secret entry;
+  `scripts/new-owner.sh` creates the separate project, volume, port and secrets it uses.
+- `HOST_PORT` sets the published loopback port (default 8787).
+- The Oura confirmation page names the connected account, so a wrong-account grant is visible at setup.
 - The `oura-mcp` host skips the bearer only in tunnel mode; before, it did so in every mode.
 - `SETUP_KEY` must be at least 32 characters; shorter keys stop startup.
 - A rejected Oura callback returns 400 and no longer cancels the pending authorization.

@@ -10,5 +10,6 @@ skill. This package contains no account information or default server URL.
 Install the Claude companion with:
 
 ```bash
-claude plugin install oura --marketplace Allmight97/oura-mcp
+claude plugin marketplace add Allmight97/oura-mcp
+claude plugin install oura@oura
 ```

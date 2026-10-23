@@ -35,11 +35,11 @@ for cloud clients. A reverse proxy or managed ingress must terminate TLS and
 preserve the public hostname. The container publishes HTTP only on host loopback;
 it does not configure your DNS, router, certificate, or firewall.
 
-1. Clone this repository and create private configuration:
+1. Download this repository (no Git needed) and create private configuration:
 
    ```bash
-   git clone https://github.com/Allmight97/oura-mcp.git
-   cd oura-mcp
+   curl -fsSL https://github.com/Allmight97/oura-mcp/archive/refs/heads/main.tar.gz | tar xz
+   mv oura-mcp-main oura-mcp && cd oura-mcp
    chmod 700 .
    cp .env.example .env
    chmod 600 .env
@@ -97,7 +97,8 @@ it does not configure your DNS, router, certificate, or firewall.
 
    Open the returned link within 10 minutes, without restarting the container,
    and confirm you are signed into the intended Oura account,
-   and approve access. The current authorization flow requests all available
+   and approve access. The confirmation page names the Oura account that was
+   connected; if it is the wrong one, sign out at Oura and repeat this step. The current authorization flow requests all available
    application scopes; Oura controls which scopes you grant. Keep the link private.
 
 7. Connect an agent below. Verify `oura_catalog` reports authorization and make
@@ -168,11 +169,31 @@ written with mode 0600. With the default image it is owned by UID 1000. Keep the
 volume private and run only one credential writer per grant. Backups can contain
 usable credentials; an older refresh token may already be spent.
 
-For another person, use a separate Compose project, volume, secrets, hostname and
-host port. For example `docker compose -p second-owner ...` separates the volume
-and network, but you must also change the published host port before running it
-beside the first instance. Never mount both owners' volumes into one container.
-Host and Docker administrators remain trusted across these installations.
+For another person, run the guided setup in a terminal on the Docker host.
+It needs only `bash`, `curl`, `openssl` and Docker, not Git:
+
+```bash
+cd /tmp && curl -fsSL https://github.com/Allmight97/oura-mcp/archive/refs/heads/main.tar.gz | tar xz
+sudo bash /tmp/oura-mcp-main/scripts/onboard.sh
+```
+
+It refuses to run without a person typing, and is started with `bash` because
+some hosts, such as Synology, forbid running programs from `/tmp`. It explains each step and its risks, then:
+
+1. Asks for a short name, a folder, a free local port and the person's HTTPS
+   hostname, and checks that the hostname's reverse proxy reaches this host.
+2. Uses the person's own Oura app (it shows where to create one and the exact
+   redirect URI), or reuses an existing install's app if you choose.
+3. Optionally takes the person's OpenAI tunnel ID and runtime key for ChatGPT.
+4. Creates the project with `scripts/new-owner.sh`: its own Compose project,
+   volume, port and fresh secrets. Secrets are typed hidden and written only to
+   that folder's private `.env`.
+5. Starts the server, prints the Oura approval link and waits until the person
+   approves. The approval page names the connected Oura account.
+
+Never mount both owners' volumes into one container. Host and Docker
+administrators can read every owner's credentials and responses, so each owner
+must trust them.
 
 Updates use `docker compose pull` followed by `docker compose up -d` (include
 `compose.openai.yaml` if that mode is enabled). Retain the volume and `.env`.
