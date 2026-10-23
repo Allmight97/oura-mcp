@@ -86,7 +86,7 @@ fi
 step "5/6" "Start the server"
 MCP_PUBLIC_HOSTNAME=$host OURA_CLIENT_ID=$OURA_CLIENT_ID OURA_CLIENT_SECRET=$OURA_CLIENT_SECRET \
   OPENAI_TUNNEL_ID=$OPENAI_TUNNEL_ID CONTROL_PLANE_API_KEY=$CONTROL_PLANE_API_KEY \
-  "$root/scripts/new-owner.sh" "$target" "$port" | sed 's/^/  /'
+  bash "$root/scripts/new-owner.sh" "$target" "$port" | sed 's/^/  /'
 files=(-f compose.yaml)
 [ -n "$OPENAI_TUNNEL_ID" ] && files+=(-f compose.openai.yaml)
 (cd "$target" && "$docker" compose "${files[@]}" up -d --pull always 2>&1 | sed 's/^/  /')

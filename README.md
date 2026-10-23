@@ -172,7 +172,7 @@ usable credentials; an older refresh token may already be spent.
 For another person, run the guided setup:
 
 ```bash
-sudo scripts/onboard.sh
+sudo bash scripts/onboard.sh
 ```
 
 Run it in a terminal on the Docker host; it refuses to run without a person
