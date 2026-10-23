@@ -78,9 +78,9 @@ class OuraCredential {
     return url.toString();
   }
 
-  async completeAuthorization(code: string, state: string): Promise<boolean> {
+  async completeAuthorization(code: string, state: string): Promise<string | undefined> {
     const pending = this.pendingAuthorization;
-    if (!pending || pending.state !== state || Date.now() - pending.issuedAt > 10 * 60 * 1000) return false;
+    if (!pending || pending.state !== state || Date.now() - pending.issuedAt > 10 * 60 * 1000) return undefined;
     this.pendingAuthorization = undefined;
 
     const token = await this.exchangeToken({
@@ -91,7 +91,7 @@ class OuraCredential {
       redirect_uri: config.redirectUri
     });
     await this.update(() => ({ token }));
-    return true;
+    return this.accountLabel(token.access_token);
   }
 
   async query(input: Query): Promise<Record<string, unknown>> {
@@ -177,6 +177,14 @@ class OuraCredential {
       refresh_token: refreshToken,
       expires_at: Math.floor(Date.now() / 1000) + expiresIn
     };
+  }
+
+  private async accountLabel(accessToken: string): Promise<string> {
+    const response = await this.fetchCollection(collectionSpec("personal_info"), { collection: "personal_info" }, accessToken).catch(() => undefined);
+    const info = response?.ok ? ((await response.json()) as { email?: unknown; id?: unknown }) : {};
+    if (typeof info.email === "string") return info.email;
+    if (typeof info.id === "string") return `the Oura account with ID ${info.id}`;
+    return "an Oura account this server could not identify";
   }
 
   private fetchCollection(spec: CollectionSpec, input: Query, accessToken: string) {
@@ -312,11 +320,16 @@ const server = createHttpServer(async (request, response) => {
         sendText(response, 400, "Oura authorization was not completed.");
         return;
       }
-      if (!(await credential.completeAuthorization(code, state))) {
+      const account = await credential.completeAuthorization(code, state);
+      if (!account) {
         sendText(response, 400, "Oura authorization state is invalid or expired. Request a new link.");
         return;
       }
-      sendText(response, 200, "Oura authorization complete. You may close this tab.");
+      sendText(
+        response,
+        200,
+        `Oura authorization complete for ${account}. If that is not the intended account, sign out at Oura, request a new link and authorize again.`
+      );
       return;
     }
 

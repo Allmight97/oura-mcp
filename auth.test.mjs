@@ -204,11 +204,15 @@ test("a stalled Oura collection request fails at its deadline", { timeout: 10000
 test("a forged callback leaves the owner's pending authorization usable", async t => {
   const directory = await mkdtemp(join(tmpdir(), "oura-callback-"));
   t.after(() => rm(directory, { recursive: true }));
-  const upstream = await stubOura(directory, `async () => Response.json({ access_token: "owner-access", refresh_token: "owner-refresh", expires_in: 3600 })`);
+  const upstream = await stubOura(directory, `async call => call.url.endsWith("/personal_info")
+    ? Response.json({ id: "owner-id", email: "owner@example.com" })
+    : Response.json({ access_token: "owner-access", refresh_token: "owner-refresh", expires_in: 3600 })`);
   const server = await startServer(t, { OURA_CREDENTIAL_FILE: join(directory, "credential.json"), NODE_OPTIONS: upstream.NODE_OPTIONS });
   const state = await server.authorizationState();
   assert.equal((await server.callback("forged", "wrong-state")).status, 400);
-  assert.equal((await server.callback("owner-code", state, "&scope=daily%20personal")).status, 200);
+  const completed = await server.callback("owner-code", state, "&scope=daily%20personal");
+  assert.equal(completed.status, 200);
+  assert.match(await completed.text(), /owner@example\.com/, "the owner sees which Oura account was connected");
   assert.equal((await server.callback("owner-code", state)).status, 400, "state is single-use");
   assert.equal((await upstream.calls()).filter(call => call.form?.code).map(call => call.form.code).join(), "owner-code");
   const catalog = (await server.callTool("oura_catalog")).structuredContent;

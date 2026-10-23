@@ -97,7 +97,8 @@ it does not configure your DNS, router, certificate, or firewall.
 
    Open the returned link within 10 minutes, without restarting the container,
    and confirm you are signed into the intended Oura account,
-   and approve access. The current authorization flow requests all available
+   and approve access. The confirmation page names the Oura account that was
+   connected; if it is the wrong one, sign out at Oura and repeat this step. The current authorization flow requests all available
    application scopes; Oura controls which scopes you grant. Keep the link private.
 
 7. Connect an agent below. Verify `oura_catalog` reports authorization and make
