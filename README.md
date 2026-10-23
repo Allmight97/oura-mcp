@@ -169,18 +169,29 @@ written with mode 0600. With the default image it is owned by UID 1000. Keep the
 volume private and run only one credential writer per grant. Backups can contain
 usable credentials; an older refresh token may already be spent.
 
-For another person, create a separate project directory:
+For another person, run the guided setup:
 
 ```bash
-scripts/new-owner.sh ../oura-alex 8788
+sudo scripts/onboard.sh
 ```
 
-It copies the Compose files and writes a private `.env` with its own project
-name, host port and fresh secrets. It refuses an existing directory. Fill in the
-listed values, then run Compose from that directory. That owner signs into Oura
-and, for ChatGPT, uses their own OpenAI tunnel. Never mount both owners' volumes
-into one container. Host and Docker administrators can read every owner's
-credentials and responses, so each owner must trust them.
+Run it in a terminal on the Docker host; it refuses to run without a person
+typing. It explains each step and its risks, then:
+
+1. Asks for a short name, a folder, a free local port and the person's HTTPS
+   hostname, and checks that the hostname's reverse proxy reaches this host.
+2. Uses the person's own Oura app (it shows where to create one and the exact
+   redirect URI), or reuses an existing install's app if you choose.
+3. Optionally takes the person's OpenAI tunnel ID and runtime key for ChatGPT.
+4. Creates the project with `scripts/new-owner.sh`: its own Compose project,
+   volume, port and fresh secrets. Secrets are typed hidden and written only to
+   that folder's private `.env`.
+5. Starts the server, prints the Oura approval link and waits until the person
+   approves. The approval page names the connected Oura account.
+
+Never mount both owners' volumes into one container. Host and Docker
+administrators can read every owner's credentials and responses, so each owner
+must trust them.
 
 Updates use `docker compose pull` followed by `docker compose up -d` (include
 `compose.openai.yaml` if that mode is enabled). Retain the volume and `.env`.

@@ -6,6 +6,7 @@ import { join } from "node:path";
 import test from "node:test";
 
 const script = new URL("scripts/new-owner.sh", import.meta.url).pathname;
+const onboard = new URL("scripts/onboard.sh", import.meta.url).pathname;
 const dockerCompose = spawnSync("docker", ["compose", "version"]).status === 0;
 
 async function readEnv(directory) {
@@ -47,4 +48,22 @@ test("two owners get separate projects, ports and secrets, and nothing is overwr
     assert.equal(config.services["oura-mcp"].ports[0].published, port);
     assert.equal(config.volumes["oura-credential"].name, `${project}_oura-credential`);
   }
+});
+
+test("answers from the guided setup land in the new owner's private .env", async t => {
+  const parent = await mkdtemp(join(tmpdir(), "oura-owner-"));
+  t.after(() => rm(parent, { recursive: true }));
+  const directory = join(parent, "kb");
+  const answers = { MCP_PUBLIC_HOSTNAME: "oura-kb.example.com", OURA_CLIENT_ID: "client-id", OURA_CLIENT_SECRET: "client-secret", OPENAI_TUNNEL_ID: "tunnel_kb", CONTROL_PLANE_API_KEY: "runtime-key" };
+  execFileSync(script, [directory, "8788"], { env: { ...process.env, ...answers } });
+  const env = await readEnv(directory);
+  for (const [name, value] of Object.entries(answers)) assert.equal(env[name], value);
+  assert.equal(env.OURA_REDIRECT_URI, "https://oura-kb.example.com/oauth/oura/callback");
+  assert.notEqual(spawnSync(script, [join(parent, "bad"), "8789"], { env: { ...process.env, OURA_CLIENT_SECRET: "two\nlines" } }).status, 0);
+});
+
+test("the guided setup refuses to run without a person at a terminal", () => {
+  const result = spawnSync(onboard, [], { input: "kb\n", encoding: "utf8" });
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /Run this in a terminal/);
 });
