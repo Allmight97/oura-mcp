@@ -35,11 +35,11 @@ for cloud clients. A reverse proxy or managed ingress must terminate TLS and
 preserve the public hostname. The container publishes HTTP only on host loopback;
 it does not configure your DNS, router, certificate, or firewall.
 
-1. Clone this repository and create private configuration:
+1. Download this repository (no Git needed) and create private configuration:
 
    ```bash
-   git clone https://github.com/Allmight97/oura-mcp.git
-   cd oura-mcp
+   curl -fsSL https://github.com/Allmight97/oura-mcp/archive/refs/heads/main.tar.gz | tar xz
+   mv oura-mcp-main oura-mcp && cd oura-mcp
    chmod 700 .
    cp .env.example .env
    chmod 600 .env
@@ -169,14 +169,16 @@ written with mode 0600. With the default image it is owned by UID 1000. Keep the
 volume private and run only one credential writer per grant. Backups can contain
 usable credentials; an older refresh token may already be spent.
 
-For another person, run the guided setup:
+For another person, run the guided setup in a terminal on the Docker host.
+It needs only `bash`, `curl`, `openssl` and Docker, not Git:
 
 ```bash
-sudo bash scripts/onboard.sh
+cd /tmp && curl -fsSL https://github.com/Allmight97/oura-mcp/archive/refs/heads/main.tar.gz | tar xz
+sudo bash /tmp/oura-mcp-main/scripts/onboard.sh
 ```
 
-Run it in a terminal on the Docker host; it refuses to run without a person
-typing. It explains each step and its risks, then:
+It refuses to run without a person typing, and is started with `bash` because
+some hosts, such as Synology, forbid running programs from `/tmp`. It explains each step and its risks, then:
 
 1. Asks for a short name, a folder, a free local port and the person's HTTPS
    hostname, and checks that the hostname's reverse proxy reaches this host.
