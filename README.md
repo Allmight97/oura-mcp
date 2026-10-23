@@ -169,11 +169,18 @@ written with mode 0600. With the default image it is owned by UID 1000. Keep the
 volume private and run only one credential writer per grant. Backups can contain
 usable credentials; an older refresh token may already be spent.
 
-For another person, use a separate Compose project, volume, secrets, hostname and
-host port. For example `docker compose -p second-owner ...` separates the volume
-and network, but you must also change the published host port before running it
-beside the first instance. Never mount both owners' volumes into one container.
-Host and Docker administrators remain trusted across these installations.
+For another person, create a separate project directory:
+
+```bash
+scripts/new-owner.sh ../oura-alex 8788
+```
+
+It copies the Compose files and writes a private `.env` with its own project
+name, host port and fresh secrets. It refuses an existing directory. Fill in the
+listed values, then run Compose from that directory. That owner signs into Oura
+and, for ChatGPT, uses their own OpenAI tunnel. Never mount both owners' volumes
+into one container. Host and Docker administrators can read every owner's
+credentials and responses, so each owner must trust them.
 
 Updates use `docker compose pull` followed by `docker compose up -d` (include
 `compose.openai.yaml` if that mode is enabled). Retain the volume and `.env`.

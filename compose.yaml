@@ -17,7 +17,7 @@ services:
       MCP_PUBLIC_HOSTNAME: ${MCP_PUBLIC_HOSTNAME:?Set MCP_PUBLIC_HOSTNAME}
       MCP_ACCESS_TOKEN: ${MCP_ACCESS_TOKEN:?Set MCP_ACCESS_TOKEN}
     ports:
-      - "127.0.0.1:8787:8787"
+      - "127.0.0.1:${HOST_PORT:-8787}:8787"
     volumes:
       - oura-credential:/data
     healthcheck:
