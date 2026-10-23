@@ -1,5 +1,5 @@
 import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { mkdir, open, readFile, rename } from "node:fs/promises";
 import { createServer as createHttpServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { dirname } from "node:path";
 import { createMcpHandler, McpServer } from "@modelcontextprotocol/server";
@@ -21,7 +21,6 @@ type OuraToken = {
 };
 
 type StoredCredential = {
-  oauth_state?: { state: string; issued_at: number };
   token?: OuraToken;
 };
 
@@ -37,32 +36,37 @@ const config = {
   clientId: requiredEnv("OURA_CLIENT_ID"),
   clientSecret: requiredEnv("OURA_CLIENT_SECRET"),
   redirectUri: requiredEnv("OURA_REDIRECT_URI"),
-  setupKey: requiredEnv("SETUP_KEY"),
+  setupKey: requiredSecret("SETUP_KEY"),
   mcpAccessToken: optionalSecret("MCP_ACCESS_TOKEN"),
   mcpPublicHostname: process.env.MCP_PUBLIC_HOSTNAME,
+  tunnelHostname: process.env.OPENAI_TUNNEL_ID ? "oura-mcp" : undefined,
   credentialFile: process.env.OURA_CREDENTIAL_FILE ?? "/data/oura-credential.json",
   port: Number(process.env.PORT ?? "8787")
 };
+
+// Below common MCP client tool-call limits. Token exchange has no deadline:
+// aborting it after Oura rotated the refresh token would lose the grant.
+const OURA_QUERY_DEADLINE_MS = 30_000;
 
 process.umask(0o077);
 
 class OuraCredential {
   private refreshInFlight?: Promise<OuraToken>;
+  private pendingAuthorization?: { state: string; issuedAt: number };
+  private updates: Promise<unknown> = Promise.resolve();
 
   async catalog(): Promise<Record<string, unknown>> {
     const stored = await this.read();
     return {
       ...catalogPayload(),
       oura_authorized: Boolean(stored.token),
-      granted_scopes: stored.token?.scope?.split(/\s+/).filter(Boolean) ?? []
+      granted_scopes: stored.token?.scope?.split(/\s+/).filter(Boolean) ?? null
     };
   }
 
-  async authorizationUrl(): Promise<string> {
-    const stored = await this.read();
+  authorizationUrl(): string {
     const state = randomUUID();
-    stored.oauth_state = { state, issued_at: Date.now() };
-    await this.write(stored);
+    this.pendingAuthorization = { state, issuedAt: Date.now() };
 
     const url = new URL("https://cloud.ouraring.com/oauth/authorize");
     url.search = new URLSearchParams({
@@ -74,14 +78,10 @@ class OuraCredential {
     return url.toString();
   }
 
-  async completeAuthorization(code: string, state: string, grantedScope?: string): Promise<void> {
-    const stored = await this.read();
-    const saved = stored.oauth_state;
-    delete stored.oauth_state;
-    if (!saved || saved.state !== state || Date.now() - saved.issued_at > 10 * 60 * 1000) {
-      await this.write(stored);
-      throw new Error("Oura authorization state is invalid or expired.");
-    }
+  async completeAuthorization(code: string, state: string): Promise<boolean> {
+    const pending = this.pendingAuthorization;
+    if (!pending || pending.state !== state || Date.now() - pending.issuedAt > 10 * 60 * 1000) return false;
+    this.pendingAuthorization = undefined;
 
     const token = await this.exchangeToken({
       grant_type: "authorization_code",
@@ -90,9 +90,8 @@ class OuraCredential {
       client_secret: config.clientSecret,
       redirect_uri: config.redirectUri
     });
-    if (grantedScope) token.scope = grantedScope;
-    stored.token = token;
-    await this.write(stored);
+    await this.update(() => ({ token }));
+    return true;
   }
 
   async query(input: Query): Promise<Record<string, unknown>> {
@@ -147,9 +146,10 @@ class OuraCredential {
       },
       previous.refresh_token
     );
-    const stored = await this.read();
-    stored.token = token;
-    await this.write(stored);
+    // A refresh that finishes after a new authorization must not restore the old grant.
+    await this.update((stored) =>
+      stored.token?.refresh_token === previous.refresh_token ? { ...stored, token } : undefined
+    );
     return token;
   }
 
@@ -190,7 +190,10 @@ class OuraCredential {
     }
     if (input.cursor) url.searchParams.set("next_token", input.cursor);
     if (input.latest) url.searchParams.set("latest", "true");
-    return fetch(url, { headers: { authorization: `Bearer ${accessToken}` } });
+    return fetch(url, {
+      headers: { authorization: `Bearer ${accessToken}` },
+      signal: AbortSignal.timeout(OURA_QUERY_DEADLINE_MS)
+    });
   }
 
   private async read(): Promise<StoredCredential> {
@@ -202,18 +205,39 @@ class OuraCredential {
     }
   }
 
+  private update(change: (stored: StoredCredential) => StoredCredential | undefined): Promise<void> {
+    const run = this.updates.then(async () => {
+      const next = change(await this.read());
+      if (next) await this.write(next);
+    });
+    this.updates = run.catch(() => undefined);
+    return run;
+  }
+
   private async write(value: StoredCredential): Promise<void> {
     await mkdir(dirname(config.credentialFile), { recursive: true, mode: 0o700 });
     const temporary = `${config.credentialFile}.new`;
-    await writeFile(temporary, JSON.stringify(value), { mode: 0o600 });
+    const file = await open(temporary, "w", 0o600);
+    try {
+      await file.writeFile(JSON.stringify(value));
+      await file.sync();
+    } finally {
+      await file.close();
+    }
     await rename(temporary, config.credentialFile);
+    const directory = await open(dirname(config.credentialFile), "r");
+    try {
+      await directory.sync();
+    } finally {
+      await directory.close();
+    }
   }
 }
 
 const credential = new OuraCredential();
 
 function createMcpServer() {
-  const server = new McpServer({ name: "oura-private-data", version: "1.1.0" });
+  const server = new McpServer({ name: "oura-private-data", version: "1.1.0" }, { maxToolInputElements: 64 });
 
   server.registerTool(
     "oura_catalog",
@@ -247,12 +271,12 @@ function createMcpServer() {
 const mcpHandler = toNodeHandler(
   createMcpHandler(() => createMcpServer(), {
     legacy: "stateless",
-    responseMode: "json"
+    responseMode: "json",
+    maxRequestBodySize: 65536
   })
 );
-const TUNNEL_HOSTNAME = "oura-mcp";
 const validateMcpHost = hostHeaderValidation(
-  [TUNNEL_HOSTNAME, "localhost", "127.0.0.1", config.mcpAccessToken ? config.mcpPublicHostname : undefined].filter(
+  [config.tunnelHostname, "localhost", "127.0.0.1", config.mcpAccessToken ? config.mcpPublicHostname : undefined].filter(
     (value): value is string => Boolean(value)
   )
 );
@@ -277,7 +301,7 @@ const server = createHttpServer(async (request, response) => {
         sendJson(response, 403, { error: "Forbidden" });
         return;
       }
-      sendJson(response, 200, { authorization_url: await credential.authorizationUrl() });
+      sendJson(response, 200, { authorization_url: credential.authorizationUrl() });
       return;
     }
 
@@ -288,7 +312,10 @@ const server = createHttpServer(async (request, response) => {
         sendText(response, 400, "Oura authorization was not completed.");
         return;
       }
-      await credential.completeAuthorization(code, state, url.searchParams.get("scope") ?? undefined);
+      if (!(await credential.completeAuthorization(code, state))) {
+        sendText(response, 400, "Oura authorization state is invalid or expired. Request a new link.");
+        return;
+      }
       sendText(response, 200, "Oura authorization complete. You may close this tab.");
       return;
     }
@@ -347,18 +374,17 @@ function validateQuery(spec: CollectionSpec, input: Query) {
   if (start > end) throw new Error("start must not be after end.");
 }
 
+const dateBound = z.iso.date();
+const datetimeBound = z.iso.datetime({ offset: true });
+
 function parseBoundary(value: string, kind: "date" | "datetime") {
-  const isDate = /^\d{4}-\d{2}-\d{2}$/.test(value);
-  const hasTimezone = /(Z|[+-]\d{2}:\d{2})$/.test(value);
-  if (kind === "date" && !isDate && !hasTimezone) {
-    throw new Error("Date bounds must use YYYY-MM-DD or an RFC 3339 timestamp.");
-  }
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) throw new Error("Invalid date or datetime bound.");
-  if (kind === "datetime" && !hasTimezone) {
-    throw new Error("Datetime bounds require a timezone.");
-  }
-  return parsed;
+  if (datetimeBound.safeParse(value).success) return new Date(value);
+  if (kind === "date" && dateBound.safeParse(value).success) return new Date(value);
+  throw new Error(
+    kind === "date"
+      ? "Date bounds must use YYYY-MM-DD or an RFC 3339 timestamp."
+      : "Datetime bounds require an RFC 3339 timestamp with a timezone."
+  );
 }
 
 function setupKeyMatches(request: IncomingMessage) {
@@ -367,12 +393,12 @@ function setupKeyMatches(request: IncomingMessage) {
   return secretMatches(value, config.setupKey);
 }
 
-// The tunnel client reaches the container by its service name and is already
-// authenticated by OpenAI. Every other host needs the bearer token once one is set.
+// In tunnel mode the tunnel client, already authenticated by OpenAI, uses its own
+// hostname. Every other host needs the bearer token once one is set.
 function accessTokenMatches(request: IncomingMessage) {
   if (!config.mcpAccessToken) return true;
   const hostname = (request.headers.host ?? "").split(":")[0];
-  if (hostname === TUNNEL_HOSTNAME) return true;
+  if (config.tunnelHostname && hostname === config.tunnelHostname) return true;
   const supplied = request.headers.authorization ?? "";
   const token = supplied.startsWith("Bearer ") ? supplied.slice("Bearer ".length) : "";
   return secretMatches(token, config.mcpAccessToken);
@@ -398,6 +424,11 @@ function optionalSecret(name: string) {
   const value = process.env[name];
   if (value && value.length < 32) throw new Error(`${name} must be at least 32 characters.`);
   return value || undefined;
+}
+
+function requiredSecret(name: string) {
+  requiredEnv(name);
+  return optionalSecret(name)!;
 }
 
 function requiredEnv(name: string) {

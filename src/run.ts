@@ -1,7 +1,8 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { setTimeout as delay } from "node:timers/promises";
 
-const { CONTROL_PLANE_API_KEY, OPENAI_TUNNEL_ID, ...mcpEnvironment } = process.env;
+const { CONTROL_PLANE_API_KEY, ...mcpEnvironment } = process.env;
+const { OPENAI_TUNNEL_ID } = process.env;
 for (const [name, value] of Object.entries({ CONTROL_PLANE_API_KEY, OPENAI_TUNNEL_ID })) {
   if (!value) throw new Error(`${name} is required.`);
 }
