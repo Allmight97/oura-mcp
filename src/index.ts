@@ -237,7 +237,7 @@ class OuraCredential {
 const credential = new OuraCredential();
 
 function createMcpServer() {
-  const server = new McpServer({ name: "oura-private-data", version: "1.1.0" });
+  const server = new McpServer({ name: "oura-private-data", version: "1.1.0" }, { maxToolInputElements: 64 });
 
   server.registerTool(
     "oura_catalog",
@@ -271,7 +271,8 @@ function createMcpServer() {
 const mcpHandler = toNodeHandler(
   createMcpHandler(() => createMcpServer(), {
     legacy: "stateless",
-    responseMode: "json"
+    responseMode: "json",
+    maxRequestBodySize: 65536
   })
 );
 const validateMcpHost = hostHeaderValidation(

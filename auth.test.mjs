@@ -32,10 +32,11 @@ async function startServer(t, settings) {
     await rm(directory, {recursive:true});
   });
   await Promise.race([once(child.stdout, "data"), closed.then(() => { throw new Error(output); })]);
-  async function request(host, token, origin, message = {jsonrpc:"2.0",id:1,method:"tools/list",params:{}}) {
+  async function request(host, token, origin, message = {jsonrpc:"2.0",id:1,method:"tools/list",params:{}}, extraHeaders = {}) {
     const headers = { Host: host, "Content-Type": "application/json", Accept: "application/json, text/event-stream" };
     if (token) headers.Authorization = `Bearer ${token}`;
     if (origin) headers.Origin = origin;
+    Object.assign(headers, extraHeaders);
     return new Promise((resolve, reject) => {
       const request = httpRequest(`http://127.0.0.1:${port}/mcp`, { method: "POST", headers }, response => {
         let body = "";
@@ -122,6 +123,29 @@ test("without tunnel mode the tunnel hostname needs the bearer like any other ho
   assert.equal((await server.request("oura-mcp:8787")).status, 403);
   assert.equal((await server.request("localhost")).status, 401);
   assert.equal((await server.request("localhost", token)).status, 200);
+});
+
+test("MCP rejects oversized bodies and excessive argument elements without breaking normal calls", async t => {
+  const token = "a".repeat(64);
+  const server = await startServer(t, { MCP_PUBLIC_HOSTNAME: "public.example", MCP_ACCESS_TOKEN: token });
+  const oversized = { jsonrpc: "2.0", id: 1, method: "tools/list", params: {}, padding: "x".repeat(65536) };
+  assert.equal((await server.request("public.example", undefined, undefined, oversized)).status, 401);
+  for (const headers of [
+    { "Content-Length": String(Buffer.byteLength(JSON.stringify(oversized))) },
+    { "Transfer-Encoding": "chunked" },
+    { "Content-Length": String(Buffer.byteLength(JSON.stringify(oversized))), "MCP-Protocol-Version": "2026-07-28" },
+    { "Transfer-Encoding": "chunked", "MCP-Protocol-Version": "2026-07-28" }
+  ]) {
+    assert.equal((await server.request("public.example", token, undefined, oversized, headers)).status, 413);
+  }
+  for (const args of [Object.fromEntries(Array.from({ length: 65 }, (_, i) => [`key${i}`, i])), { nested: Array(65).fill(0) }]) {
+    const response = await server.request("public.example", token, undefined, { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "oura_catalog", arguments: args } });
+    assert.equal(response.status, 200);
+    assert.equal(parse(await response.text()).result.isError, true);
+  }
+  const accepted = await server.request("public.example", token);
+  assert.equal(accepted.status, 200);
+  assert.deepEqual(parse(await accepted.text()).result.tools.map(tool => tool.name).sort(), ["oura_catalog", "oura_query"]);
 });
 
 test("a query maps bounds and cursor, retries once after 401 with a refreshed token, and returns Oura data unchanged", async t => {

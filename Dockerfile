@@ -5,7 +5,7 @@ RUN curl -fsSLO https://github.com/openai/tunnel-client/releases/download/v0.0.1
     && echo "29adfe5c1399dfb9fda9383f230c324355912f50dc36e2e416b1f1322317b3c4  tunnel-client-v0.0.11-linux-amd64.zip" | sha256sum -c - \
     && unzip tunnel-client-v0.0.11-linux-amd64.zip
 
-FROM node:24-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f AS build
+FROM node:24.22.1-alpine@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d3ecec86c33918b53 AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
@@ -13,7 +13,7 @@ COPY tsconfig.json ./
 COPY src ./src
 RUN npm run build
 
-FROM node:24-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f
+FROM node:24.22.1-alpine@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d3ecec86c33918b53
 LABEL org.opencontainers.image.source="https://github.com/Allmight97/oura-mcp" \
       org.opencontainers.image.licenses="MIT" \
       org.opencontainers.image.description="Self-hosted read-only Oura MCP for one account per deployment"
